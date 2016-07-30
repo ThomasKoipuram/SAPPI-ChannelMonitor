@@ -117,4 +117,16 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="label11.Text" xml:space="preserve">
+    <value>1. Add/Delete/Save upto 5 system settings.
+2. Search channel by Service and Channel Name. 
+3. Search channel using * Wildcard (This is helpful to select all channels in a service or even the entire list of channels in the system.)
+4. Filter search results by combining 5 different criterias. (Service, Channel Name, Activation State, Channel State and Error Log)
+5. Quick reset of search filters.
+6. Sort any column in the search result window.
+7. You can copy paste the selected/entire search results into the application of your choice. e.g. Excel/Notepad.
+8. Display number of channels in the search result. (Helpful for offline reporting).
+9. User friendly Help section providing step by step information on how to use the tool.
+</value>
+  </data>
 </root>

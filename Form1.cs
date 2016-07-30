@@ -16,8 +16,10 @@ namespace ChannelMonitor
 {
     public partial class Form1 : Form
     {
+        //Setting some variables globally
         String SearchQuery = "";
         String url = "";
+        int chCount = 0;
         
         public Form1()
         {
@@ -25,6 +27,7 @@ namespace ChannelMonitor
             myToolTip();
         }
 
+        //Setting Tool tip values
         private void myToolTip()
         {
             ToolTip myToolTip = new ToolTip();
@@ -35,19 +38,21 @@ namespace ChannelMonitor
             myToolTip.SetToolTip(textBox5, "Filter results by Activation State");
             myToolTip.SetToolTip(textBox6, "Filter results by Channel State");
             myToolTip.SetToolTip(textBox12, "Filter results by Error Log");
-            myToolTip.SetToolTip(button3, "Remove all filters");
-            myToolTip.SetToolTip(button5, "You can add upto 5 systems");
+            myToolTip.SetToolTip(button3, "Remove all applied filters");
+            myToolTip.SetToolTip(button5, "You can save upto 5 systems");
+            myToolTip.SetToolTip(button1, "To prevent unnecessary load in the system, avoid running with both parameters as *.");
+            myToolTip.SetToolTip(button6, "Caution: The system entry will be deleted instantly!");
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            button1.Enabled = false;
-            Application.UseWaitCursor = true;
+            label21.Visible = true;
+            Cursor.Current = Cursors.WaitCursor;
             String temp1 = "";
             String url1 = "";
             //Save the current system selected in the system dropdown
             temp1 = comboBox1.Text.ToString();
-            //MessageBox.Show("Text:"+temp1+"*");
+            //MessageBox.Show("Selected System:"+temp1+"*");
 
             //Dynamically set the webservice url based on the values given in settings tab.
             if (temp1 != "Empty" && temp1 != "Select System")
@@ -72,57 +77,117 @@ namespace ChannelMonitor
                 {
                     url1 = SAPPIChannelMonitor.Properties.Settings.Default["sid5"].ToString();
                 }
+                //MessageBox.Show(url1);
+                //Call the URL and save response data as XML. Handle any exceptions while doing the webservice call
+                try
+                {
+                    //******************Read workspace location from system settings******************//
+                    String url1Temp = "";
+                    String xDocTemp = "";
+                    url1Temp = SAPPIChannelMonitor.Properties.Settings.Default["workspace"].ToString();
+                    xDocTemp = url1Temp.Replace(@":\", @":\\");
 
-            //Call the URL and save response data as XML            
-            //WebClient Client = new WebClient ();
-            //Client.DownloadFile(url1, @"D:\channel.xml");
-            
-            //Replace unwanted tags in the downloaded XML
-            XDocument doc = XDocument.Load("D:\\channel.xml");
-            
-            //Converting XDocument to String
-            String xmlContent = doc.ToString();
+                    WebClient Client = new WebClient();
+                    //Client.DownloadFile(url1, @"D:\channel.xml");
+                    //Client.DownloadFile(url1, url1Temp);
+                    //MessageBox.Show("Download complete...");
 
-            //Removing <!DOCTYPE ChannelStatusResult SYSTEM "/AdapterFramework/channelAdmin/ChannelAdmin.dtd"[]> from XML file
-            string xmlHeader = @"<!DOCTYPE ChannelStatusResult SYSTEM ""/AdapterFramework/channelAdmin/ChannelAdmin.dtd""[]>";
-            xmlContent = xmlContent.Replace(xmlHeader, "");
+                    //******************Formating file location to include file name******************//
 
-            //Removing the <Channels> node
-            xmlContent = xmlContent.Replace("<Channels>", "");
-            xmlContent = xmlContent.Replace("</Channels>", "");
-            //MessageBox.Show(xmlContent);
+                    url1Temp = url1Temp + "channel.xml";
+                    xDocTemp = xDocTemp + "channel.xml";
+                    //MessageBox.Show(xDocTemp);
+                    //MessageBox.Show(url1Temp);
 
-            //Write it back to XDocument and overwrite file
-            
-            doc = XDocument.Parse(xmlContent);
-            doc.Save("D:\\channel.xml");
-            
-            //Read the XML into the table view
-            DataSet dataSet = new DataSet();
-            dataSet.ReadXml(@"D:\channel.xml");
-            dataGridView1.DataSource = dataSet.Tables[0];
+                    //******************Replace unwanted tags in the downloaded XML******************//
 
-            //Remove unwanted columns from Dataset
-            //dataGridView1.Columns.Remove("ChannelID");
-            //dataGridView1.Columns.Remove("Party");
+                    //MessageBox.Show("Trying to load file from downloaded location *" + xDocTemp+ "*");
+                    string xmlContent = System.IO.File.ReadAllText(url1Temp);
+                    //MessageBox.Show("Load complete..." + xmlContent);
 
-            //Set parameters for Wordwrap in DataGrid (Short log column)
-            dataGridView1.Columns[4].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
-            dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+                    //******************Removing funny characters from content******************//
 
-            //Set parameters for Column Width in DataGrid (Activation Mode, Channel Status) Col ID: 2,3
-            DataGridViewColumn column2 = dataGridView1.Columns[2];
-            column2.Width = 120;
-            DataGridViewColumn column3 = dataGridView1.Columns[3];
-            column3.Width = 120;
+                    xmlContent = xmlContent.Replace(@"<ShortLog>", @"<ShortLog><![CDATA[");
+                    xmlContent = xmlContent.Replace(@"</ShortLog>", @"]]></ShortLog>");
+                    //xmlContent = xmlContent.Replace("AS2MessageId <24719174.410397895.2016-06-17.122807.34@tradecard>, 
 
-            Application.UseWaitCursor = false;
-            button1.Enabled = true;
+                    //**************************************************************************//
+
+                    //Removing <!DOCTYPE ChannelStatusResult SYSTEM "/AdapterFramework/channelAdmin/ChannelAdmin.dtd"[]> from XML file
+                    string xmlHeader = @"<!DOCTYPE ChannelStatusResult SYSTEM ""/AdapterFramework/channelAdmin/ChannelAdmin.dtd""[]>";
+                    xmlContent = xmlContent.Replace(xmlHeader, @"");
+
+                    //******************Removing the <Channels> node********************//
+
+                    xmlContent = xmlContent.Replace(@"<Channels>", @"");
+                    xmlContent = xmlContent.Replace(@"</Channels>", @"");
+                    //MessageBox.Show("Going to save file" + xmlContent + "*");
+
+                    //******************Write it back to XDocument and overwrite file********************//  
+
+                    var streamWriter = System.IO.File.CreateText(xDocTemp);
+                    streamWriter.Write(xmlContent);
+
+                    //******************Finish writing to the file********************//
+
+                    streamWriter.Close();
+                    //MessageBox.Show("Savedfile" + xmlContent + "*");
+
+                    //******************Read the XML into the table view********************//
+
+                    DataSet dataSet = new DataSet();
+                    //dataSet.ReadXml(@"D:\channel.xml");
+                    dataSet.ReadXml(url1Temp);
+                    dataGridView1.DataSource = dataSet.Tables[0];
+
+                    //******************Remove unwanted columns from Dataset********************//
+
+                    dataGridView1.Columns.Remove("ChannelID");
+                    dataGridView1.Columns.Remove("Party");
+
+                    //******************Set parameters for Wordwrap in DataGrid (Short log column)********************//
+
+                    dataGridView1.Columns[4].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+                    dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+
+                    //Set parameters for Column Width in DataGrid (Activation Mode, Channel Status) Col ID: 2,3
+
+                    DataGridViewColumn column2 = dataGridView1.Columns[2];
+                    column2.Width = 120;
+                    DataGridViewColumn column3 = dataGridView1.Columns[3];
+                    column3.Width = 120;
+
+                    //******************Count of rows in datagrid to be displayed in Label 7********************//
+                    int chCount = dataGridView1.Rows.Count;
+                    if (chCount == 0)
+                    {
+                        label7.Text = " 0 Channels found";
+                    }
+                    else if (chCount == 2)
+                    {
+                        label7.Text = (chCount - 1).ToString() + " Channel found";
+                    }
+                    else
+                    {
+                        label7.Text = (chCount - 1).ToString() + " Channels found";
+                    }
+
+                    Cursor.Current = Cursors.Default;
+                    button1.Enabled = true;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Check the system parameters for System " + temp1 + "." + ex + ".", "Error calling Webservice");
+                    label21.Visible = false;
+                    Cursor.Current = Cursors.Default;
+                    button1.Enabled = true;
+                }
             }
             else
             {
-                MessageBox.Show("Please select and save the system settings in the settings tab.");
-                Application.UseWaitCursor = false;
+                MessageBox.Show("Please select and save the system settings in the settings tab.", "Error");
+                label21.Visible = false;
+                Cursor.Current = Cursors.Default;
                 button1.Enabled = true;
             }
         }
@@ -130,133 +195,310 @@ namespace ChannelMonitor
         //Filter logic for all the columns implemented below
         private void textBox4_TextChanged(object sender, EventArgs e)
         {
-            
-            if(textBox4.Text!="")
+            if (textBox4.Text != "")
             {
                 SearchQuery = string.Format("Service LIKE '%{0}%'", textBox4.Text);
+            }
+            else
+            {
+                SearchQuery = string.Format("Service LIKE '%{0}%'", "*");
             }
             if (textBox3.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", textBox3.Text);
             }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", "*");
+            }
             if (textBox5.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", textBox5.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", "*");
             }
             if (textBox6.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ChannelState LIKE '%{0}%'", textBox6.Text);
             }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelState LIKE '%{0}%'", "*");
+            }
             if (textBox12.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", textBox12.Text);
             }
-            
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", "*");
+            }
+
             (dataGridView1.DataSource as DataTable).DefaultView.RowFilter = SearchQuery;
+
+            //******************Count of rows in datagrid to be displayed in Label 7********************//
+            chCount = dataGridView1.Rows.Count;
+            if (chCount == 0)
+            {
+                label7.Text = " 0 Channels found";
+            }
+            else if (chCount == 2)
+            {
+                label7.Text = (chCount - 1).ToString() + " Channel found";
+            }
+            else
+            {
+                label7.Text = (chCount - 1).ToString() + " Channels found";
+            }
         }
 
         private void textBox3_TextChanged(object sender, EventArgs e)
         {
-            if (textBox3.Text != "")
-            {
-                SearchQuery = SearchQuery + string.Format("ChannelName LIKE '%{0}%'", textBox3.Text);
-            }
             if (textBox4.Text != "")
             {
-                SearchQuery = string.Format("AND Service LIKE '%{0}%'", textBox4.Text);
+                SearchQuery = string.Format("Service LIKE '%{0}%'", textBox4.Text);
+            }
+            else
+            {
+                SearchQuery = string.Format("Service LIKE '%{0}%'", "*");
+            }
+            if (textBox3.Text != "")
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", textBox3.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", "*");
             }
             if (textBox5.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", textBox5.Text);
             }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", "*");
+            }
             if (textBox6.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ChannelState LIKE '%{0}%'", textBox6.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelState LIKE '%{0}%'", "*");
             }
             if (textBox12.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", textBox12.Text);
             }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", "*");
+            }
 
             (dataGridView1.DataSource as DataTable).DefaultView.RowFilter = SearchQuery;
+
+            //******************Count of rows in datagrid to be displayed in Label 7********************//
+
+            chCount = dataGridView1.Rows.Count;
+            if (chCount == 0)
+            {
+                label7.Text = " 0 Channels found";
+            }
+            else if (chCount == 2)
+            {
+                label7.Text = (chCount - 1).ToString() + " Channel found";
+            }
+            else
+            {
+                label7.Text = (chCount - 1).ToString() + " Channels found";
+            }
         }
 
         private void textBox5_TextChanged(object sender, EventArgs e)
         {
-            if (textBox5.Text != "")
-            {
-                SearchQuery = SearchQuery + string.Format("ActivationState LIKE '%{0}%'", textBox5.Text);
-            }
             if (textBox4.Text != "")
             {
-                SearchQuery = string.Format("AND Service LIKE '%{0}%'", textBox4.Text);
+                SearchQuery = string.Format("Service LIKE '%{0}%'", textBox4.Text);
+            }
+            else
+            {
+                SearchQuery = string.Format("Service LIKE '%{0}%'", "*");
             }
             if (textBox3.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", textBox3.Text);
             }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", "*");
+            }
+            if (textBox5.Text != "")
+            {
+                SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", textBox5.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", "*");
+            }
             if (textBox6.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ChannelState LIKE '%{0}%'", textBox6.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelState LIKE '%{0}%'", "*");
             }
             if (textBox12.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", textBox12.Text);
             }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", "*");
+            }
 
             (dataGridView1.DataSource as DataTable).DefaultView.RowFilter = SearchQuery;
+
+            //******************Count of rows in datagrid to be displayed in Label 7********************//
+            chCount = dataGridView1.Rows.Count;
+            if (chCount == 0)
+            {
+                label7.Text = " 0 Channels found";
+            }
+            else if (chCount == 2)
+            {
+                label7.Text = (chCount - 1).ToString() + " Channel found";
+            }
+            else
+            {
+                label7.Text = (chCount - 1).ToString() + " Channels found";
+            }
         }
 
         private void textBox6_TextChanged(object sender, EventArgs e)
         {
-            if (textBox6.Text != "")
-            {
-                SearchQuery = SearchQuery + string.Format("ChannelState LIKE '%{0}%'", textBox6.Text);
-            }
             if (textBox4.Text != "")
             {
-                SearchQuery = string.Format("AND Service LIKE '%{0}%'", textBox4.Text);
+                SearchQuery = string.Format("Service LIKE '%{0}%'", textBox4.Text);
+            }
+            else
+            {
+                SearchQuery = string.Format("Service LIKE '%{0}%'", "*");
             }
             if (textBox3.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", textBox3.Text);
             }
-            if (textBox5.Text != "")
+            else
             {
-                SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", textBox5.Text);
-            }
-            if (textBox12.Text != "")
-            {
-                SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", textBox12.Text);
-            }
-
-            (dataGridView1.DataSource as DataTable).DefaultView.RowFilter = SearchQuery;
-        }
-
-        private void textBox12_TextChanged(object sender, EventArgs e)
-        {
-            if (textBox12.Text != "")
-            {
-                SearchQuery = SearchQuery + string.Format("ShortLog LIKE '%{0}%'", textBox12.Text);
-            }
-            if (textBox4.Text != "")
-            {
-                SearchQuery = string.Format("AND Service LIKE '%{0}%'", textBox4.Text);
-            }
-            if (textBox3.Text != "")
-            {
-                SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", textBox3.Text);
+                SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", "*");
             }
             if (textBox5.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", textBox5.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", "*");
             }
             if (textBox6.Text != "")
             {
                 SearchQuery = SearchQuery + string.Format("AND ChannelState LIKE '%{0}%'", textBox6.Text);
             }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelState LIKE '%{0}%'", "*");
+            }
+            if (textBox12.Text != "")
+            {
+                SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", textBox12.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", "*");
+            }
 
             (dataGridView1.DataSource as DataTable).DefaultView.RowFilter = SearchQuery;
+
+            //******************Count of rows in datagrid to be displayed in Label 7********************//
+
+            chCount = dataGridView1.Rows.Count;
+            if (chCount == 0)
+            {
+                label7.Text = " 0 Channels found";
+            }
+            else if (chCount == 2)
+            {
+                label7.Text = (chCount - 1).ToString() + " Channel found";
+            }
+            else
+            {
+                label7.Text = (chCount - 1).ToString() + " Channels found";
+            }
+        }
+
+        private void textBox12_TextChanged(object sender, EventArgs e)
+        {
+            if (textBox4.Text != "")
+            {
+                SearchQuery = string.Format("Service LIKE '%{0}%'", textBox4.Text);
+            }
+            else
+            {
+                SearchQuery = string.Format("Service LIKE '%{0}%'", "*");
+            }
+            if (textBox3.Text != "")
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", textBox3.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelName LIKE '%{0}%'", "*");
+            }
+            if (textBox5.Text != "")
+            {
+                SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", textBox5.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ActivationState LIKE '%{0}%'", "*");
+            }
+            if (textBox6.Text != "")
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelState LIKE '%{0}%'", textBox6.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ChannelState LIKE '%{0}%'", "*");
+            }
+            if (textBox12.Text != "")
+            {
+                SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", textBox12.Text);
+            }
+            else
+            {
+                SearchQuery = SearchQuery + string.Format("AND ShortLog LIKE '%{0}%'", "*");
+            }
+
+            (dataGridView1.DataSource as DataTable).DefaultView.RowFilter = SearchQuery;
+
+            //******************Count of rows in datagrid to be displayed in Label 7********************//
+
+            chCount = dataGridView1.Rows.Count;
+            if (chCount == 0)
+            {
+                label7.Text = " 0 Channels found";
+            }
+            else if (chCount == 2)
+            {
+                label7.Text = (chCount - 1).ToString() + " Channel found";
+            }
+            else
+            {
+                label7.Text = (chCount - 1).ToString() + " Channels found";
+            }
         }
 
         //Logic for reset button in the Filter section
@@ -358,45 +600,85 @@ namespace ChannelMonitor
             //Saving the values from the settings form into the application settings file and ADDING NEW systems via form
             if (textBox1.Text != "" && textBox2.Text != "" && textBox13.Text != "" && textBox14.Text != "" && textBox15.Text != "")
             {
-                url = "http://" + textBox1.Text + ":" + textBox2.Text + "/AdapterFramework/ChannelAdminServlet?party=*&service=" + textBox8.Text + "&channel=*&action=status&showProcessLog=true&j_user=" + textBox14.Text + "&j_password=" + textBox15.Text;
-                if (SAPPIChannelMonitor.Properties.Settings.Default["sid1"].ToString() == "")
+
+                //Checking if SID already configured
+                int flag = 0;
+                String compare = "";
+                compare = textBox13.Text.ToUpper();
+
+                if ( compare == SAPPIChannelMonitor.Properties.Settings.Default["sid1Name"].ToString())
                 {
-                    SAPPIChannelMonitor.Properties.Settings.Default["sid1"] = url;
-                    SAPPIChannelMonitor.Properties.Settings.Default["sid1Name"] = textBox13.Text.ToUpper();
-                    MessageBox.Show(textBox13.Text.ToUpper() + " system added successfully. Now select it from the dropdown and save your selection.");
+                    flag++;
                 }
-                else if (SAPPIChannelMonitor.Properties.Settings.Default["sid2"].ToString() == "")
+                if (compare == SAPPIChannelMonitor.Properties.Settings.Default["sid2Name"].ToString())
                 {
-                    SAPPIChannelMonitor.Properties.Settings.Default["sid2"] = url;
-                    SAPPIChannelMonitor.Properties.Settings.Default["sid2Name"] = textBox13.Text.ToUpper();
-                    MessageBox.Show(textBox13.Text.ToUpper() + " system added successfully. Now select it from the dropdown and save your selection.");
+                    flag++;
                 }
-                else if (SAPPIChannelMonitor.Properties.Settings.Default["sid3"].ToString() == "")
+                if (compare == SAPPIChannelMonitor.Properties.Settings.Default["sid3Name"].ToString())
                 {
-                    SAPPIChannelMonitor.Properties.Settings.Default["sid3"] = url;
-                    SAPPIChannelMonitor.Properties.Settings.Default["sid3Name"] = textBox13.Text.ToUpper();
-                    MessageBox.Show(textBox13.Text.ToUpper() + " system added successfully. Now select it from the dropdown and save your selection.");
+                    flag++;
                 }
-                else if (SAPPIChannelMonitor.Properties.Settings.Default["sid4"].ToString() == "")
+                if (compare == SAPPIChannelMonitor.Properties.Settings.Default["sid4Name"].ToString())
                 {
-                    SAPPIChannelMonitor.Properties.Settings.Default["sid4"] = url;
-                    SAPPIChannelMonitor.Properties.Settings.Default["sid4Name"] = textBox13.Text.ToUpper();
-                    MessageBox.Show(textBox13.Text.ToUpper() + " system added successfully. Now select it from the dropdown and save your selection.");
+                    flag++;
                 }
-                else if (SAPPIChannelMonitor.Properties.Settings.Default["sid5"].ToString() == "")
+                if (compare == SAPPIChannelMonitor.Properties.Settings.Default["sid5Name"].ToString())
                 {
-                    SAPPIChannelMonitor.Properties.Settings.Default["sid5"] = url;
-                    SAPPIChannelMonitor.Properties.Settings.Default["sid5Name"] = textBox13.Text.ToUpper();
-                    MessageBox.Show(textBox13.Text.ToUpper() + " system added successfully. Now select it from the dropdown and save your selection.");
+                    flag++;
+                }
+
+                //If SID is unique, saving it to the application settings
+                if (flag <= 0)
+                {
+                    url = "http://" + textBox1.Text + ":" + textBox2.Text + "/AdapterFramework/ChannelAdminServlet?party=" + textBox9.Text + "&service=" + textBox8.Text + "&channel=*&action=status&showProcessLog=true&j_user=" + textBox14.Text + "&j_password=" + textBox15.Text;
+                    if (SAPPIChannelMonitor.Properties.Settings.Default["sid1"].ToString() == "")
+                    {
+                        SAPPIChannelMonitor.Properties.Settings.Default["sid1"] = url;
+                        SAPPIChannelMonitor.Properties.Settings.Default["sid1Name"] = textBox13.Text.ToUpper();
+                        SAPPIChannelMonitor.Properties.Settings.Default.Save();
+                        MessageBox.Show(textBox13.Text.ToUpper() + " system added successfully. Now select it from the dropdown and save your selection.", "Success!");
+                    }
+                    else if (SAPPIChannelMonitor.Properties.Settings.Default["sid2"].ToString() == "")
+                    {
+                        SAPPIChannelMonitor.Properties.Settings.Default["sid2"] = url;
+                        SAPPIChannelMonitor.Properties.Settings.Default["sid2Name"] = textBox13.Text.ToUpper();
+                        SAPPIChannelMonitor.Properties.Settings.Default.Save();
+                        MessageBox.Show(textBox13.Text.ToUpper() + " system added successfully. Now select it from the dropdown and save your selection.", "Success!");
+                    }
+                    else if (SAPPIChannelMonitor.Properties.Settings.Default["sid3"].ToString() == "")
+                    {
+                        SAPPIChannelMonitor.Properties.Settings.Default["sid3"] = url;
+                        SAPPIChannelMonitor.Properties.Settings.Default["sid3Name"] = textBox13.Text.ToUpper();
+                        SAPPIChannelMonitor.Properties.Settings.Default.Save();
+                        MessageBox.Show(textBox13.Text.ToUpper() + " system added successfully. Now select it from the dropdown and save your selection.", "Success!");
+                    }
+                    else if (SAPPIChannelMonitor.Properties.Settings.Default["sid4"].ToString() == "")
+                    {
+                        SAPPIChannelMonitor.Properties.Settings.Default["sid4"] = url;
+                        SAPPIChannelMonitor.Properties.Settings.Default["sid4Name"] = textBox13.Text.ToUpper();
+                        SAPPIChannelMonitor.Properties.Settings.Default.Save();
+                        MessageBox.Show(textBox13.Text.ToUpper() + " system added successfully. Now select it from the dropdown and save your selection.", "Success!");
+                    }
+                    else if (SAPPIChannelMonitor.Properties.Settings.Default["sid5"].ToString() == "")
+                    {
+                        SAPPIChannelMonitor.Properties.Settings.Default["sid5"] = url;
+                        SAPPIChannelMonitor.Properties.Settings.Default["sid5Name"] = textBox13.Text.ToUpper();
+                        SAPPIChannelMonitor.Properties.Settings.Default.Save();
+                        MessageBox.Show(textBox13.Text.ToUpper() + " system added successfully. Now select it from the dropdown and save your selection.", "Success!");
+                    }
+                    else
+                    {
+                        MessageBox.Show("You can only add 5 systems. Please delete one to continue.","Error");
+                    }
                 }
                 else
                 {
-                    MessageBox.Show("You can only add 5 systems. Please delete one to continue.");
+                    MessageBox.Show("SID name already configured. Please choose a different SID name","Error");
                 }
-            }
+            }  
             else
             {
-                MessageBox.Show("Either of SID, Hostname, Port, Username or Password is missing!");
+                MessageBox.Show("Either of SID, Hostname, Port, Username or Password is missing!","Error");
             }
             this.Form1_Load(this, null);
             comboBox1.Text = "Select System";
@@ -414,36 +696,41 @@ namespace ChannelMonitor
                 {
                     SAPPIChannelMonitor.Properties.Settings.Default["sid1"] = "";
                     SAPPIChannelMonitor.Properties.Settings.Default["sid1Name"] = "";
-                    MessageBox.Show(temp + " system deleted");
+                    SAPPIChannelMonitor.Properties.Settings.Default.Save();
+                    MessageBox.Show(temp + " system deleted","Success!");
                 }
                 else if (SAPPIChannelMonitor.Properties.Settings.Default["sid2Name"].ToString() == temp)
                 {
                     SAPPIChannelMonitor.Properties.Settings.Default["sid2"] = "";
                     SAPPIChannelMonitor.Properties.Settings.Default["sid2Name"] = "";
-                    MessageBox.Show(temp + " system deleted");
+                    SAPPIChannelMonitor.Properties.Settings.Default.Save();
+                    MessageBox.Show(temp + " system deleted", "Success!");
                 }
                 else if (SAPPIChannelMonitor.Properties.Settings.Default["sid3Name"].ToString() == temp)
                 {
                     SAPPIChannelMonitor.Properties.Settings.Default["sid3"] = "";
                     SAPPIChannelMonitor.Properties.Settings.Default["sid3Name"] = "";
-                    MessageBox.Show(temp + " system deleted");
+                    SAPPIChannelMonitor.Properties.Settings.Default.Save();
+                    MessageBox.Show(temp + " system deleted", "Success!");
                 }
                 else if (SAPPIChannelMonitor.Properties.Settings.Default["sid4Name"].ToString() == temp)
                 {
                     SAPPIChannelMonitor.Properties.Settings.Default["sid4"] = "";
                     SAPPIChannelMonitor.Properties.Settings.Default["sid4Name"] = "";
-                    MessageBox.Show(temp + " system deleted");
+                    SAPPIChannelMonitor.Properties.Settings.Default.Save();
+                    MessageBox.Show(temp + " system deleted", "Success!");
                 }
                 else if (SAPPIChannelMonitor.Properties.Settings.Default["sid5Name"].ToString() == temp)
                 {
                     SAPPIChannelMonitor.Properties.Settings.Default["sid5"] = "";
                     SAPPIChannelMonitor.Properties.Settings.Default["sid5Name"] = "";
-                    MessageBox.Show(temp + " system deleted");
+                    SAPPIChannelMonitor.Properties.Settings.Default.Save();
+                    MessageBox.Show(temp + " system deleted", "Success!");
                 }
             }
             else
             {
-                MessageBox.Show("Select a valid system to delete.");
+                MessageBox.Show("Select a valid system to delete.","Error");
             }
             this.Form1_Load(this, null);
             comboBox1.Text = "Select System";
@@ -454,18 +741,56 @@ namespace ChannelMonitor
             //System selection notifier
             if(comboBox1.Text.ToString() != "Empty" && comboBox1.Text.ToString() != "Select System")
             { 
-            MessageBox.Show(comboBox1.Text.ToString() + " System selection saved. Now you can run the Channel Monitor.");
+            MessageBox.Show(comboBox1.Text.ToString() + " System selection saved. Now you can run the Channel Monitor.","Success!");
             }
             else
             {
-                MessageBox.Show("Select a valid system.");
+                MessageBox.Show("Select a valid system to save.","Error");
             }
         }
 
         private void button2_Click_1(object sender, EventArgs e)
         {
+            //Load Help form
             Form2 f2 = new Form2();
             f2.ShowDialog();
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            // Create a new instance of FolderBrowserDialog.
+
+            FolderBrowserDialog folderBrowserDlg = new FolderBrowserDialog();
+
+            // A new folder button will display in FolderBrowserDialog.
+
+            folderBrowserDlg.ShowNewFolderButton = true;
+
+            //Show FolderBrowserDialog
+
+            DialogResult dlgResult = folderBrowserDlg.ShowDialog();
+
+
+            if (dlgResult.Equals(DialogResult.OK))
+
+            {
+
+                //Show selected folder path in textbox7.
+
+                textBox7.Text = folderBrowserDlg.SelectedPath;
+
+                //Browsing start from root folder.
+
+                Environment.SpecialFolder rootFolder = folderBrowserDlg.RootFolder;
+
+            }
+        }
+
+        private void button8_Click(object sender, EventArgs e)
+        {
+            SAPPIChannelMonitor.Properties.Settings.Default["workspace"] = textBox7.Text;
+            SAPPIChannelMonitor.Properties.Settings.Default.Save();
+            MessageBox.Show("Workspace location saved successfully.", "Success!");
         }
     }
 }

@@ -142,5 +142,17 @@ namespace SAPPIChannelMonitor.Properties {
                 this["sid5Name"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string workspace {
+            get {
+                return ((string)(this["workspace"]));
+            }
+            set {
+                this["workspace"] = value;
+            }
+        }
     }
 }
